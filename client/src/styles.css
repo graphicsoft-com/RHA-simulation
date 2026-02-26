@@ -1,4 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Syne:wght@600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-/* You can add global styles to this file, and also import other style files */
+
+@layer base {
+  html, body, #root {
+    @apply bg-bg text-text font-mono;
+    min-height: 100vh;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  /* Pulsing indicator dot */
+  .pulse-dot {
+    @apply inline-block w-1.5 h-1.5 rounded-full bg-green;
+    box-shadow: 0 0 6px #00ff88;
+    animation: pulse2 2s ease-in-out infinite;
+  }
+
+  .pulse-dot.idle {
+    @apply bg-muted;
+    box-shadow: none;
+    animation: none;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-surface;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted;
+  }
+}

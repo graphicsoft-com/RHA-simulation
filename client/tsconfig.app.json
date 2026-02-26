@@ -1,6 +1,8 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
     "jsx": "react-jsx",
@@ -11,9 +13,13 @@
       "@nx/react/typings/image.d.ts",
       "vite/client"
     ],
-    "rootDir": "src",
     "module": "esnext",
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "composite": false,
+    "baseUrl": ".",
+    "paths": {
+      "@org/shared-types": ["../shared-types/dist/index.d.ts"]
+    }
   },
   "exclude": [
     "out-tsc",
