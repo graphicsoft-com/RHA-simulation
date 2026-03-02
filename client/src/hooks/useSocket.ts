@@ -9,7 +9,7 @@ import { io, Socket } from 'socket.io-client';
 import { speak, stopSpeaking, initTTS } from '../services/ttsService';
 import type { ISocketNewMessage } from '@org/shared-types';
 
-const SERVER_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const SERVER_URL = import.meta.env.VITE_API_URL || '';
 
 // Re-exported so components can type live messages
 export type LiveMessage = ISocketNewMessage;
