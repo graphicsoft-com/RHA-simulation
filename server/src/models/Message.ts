@@ -29,7 +29,7 @@ const MessageSchema = new Schema<IMessageDocument>(
 
     role: {
       type: String,
-      enum: ['clinician', 'patient'] satisfies IAgentRole[],
+      enum: ['caregiver', 'tenant'] satisfies IAgentRole[],
       required: [true, 'role is required'],
     },
 

@@ -6,7 +6,7 @@ export default function Dashboard() {
   const { rooms, loading, error, startRoom, stopRoom, activeCount } = useRoomStatus();
 
   // Single shared socket on dashboard mode — receives messages from ALL rooms
-  const { messages: liveMessages, connected } = useSocket({
+  const { connected } = useSocket({
     roomId: 'dashboard',
     audioEnabled: false, // audio handled per-card
     dashboard: true,
@@ -34,15 +34,9 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-end justify-between mb-8">
         <div>
-          <div className="text-[10px] text-muted tracking-[0.25em] uppercase mb-2">
-            iPole Project · RHA Testing
-          </div>
           <h1 className="font-display text-3xl font-800 text-white tracking-tight">
             Room <span className="text-cyan">Command</span>
           </h1>
-          <p className="text-xs text-muted mt-1">
-            AI patient-clinician simulation across 6 rooms · 6PM–4AM daily
-          </p>
         </div>
 
         {/* Stats bar */}
@@ -72,15 +66,12 @@ export default function Dashboard() {
             room={room}
             onStart={startRoom}
             onStop={stopRoom}
-            liveMessages={liveMessages}
           />
         ))}
       </div>
 
       {/* Bottom status bar */}
       <div className="mt-8 pt-4 border-t border-border flex items-center justify-between text-[10px] text-muted tracking-widest">
-        <span>SCHEDULE · AUTO START 18:00 · AUTO STOP 04:00 · AMERICA/DENVER</span>
-        <span>SONA RECORDING · NUIQ TRANSCRIPTION · BANNA EHR</span>
       </div>
     </div>
   );

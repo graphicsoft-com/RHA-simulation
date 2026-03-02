@@ -35,9 +35,9 @@ const SessionSchema: Schema = new Schema<ISessionDocument>(
       index: true,
     },
 
-    patientProfile: {
+    tenantProfile: {
       type: String,
-      required: [true, 'patientProfile is required'],
+      required: [true, 'tenantProfile is required'],
     },
 
     messageCount: {

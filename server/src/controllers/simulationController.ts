@@ -46,7 +46,7 @@ export async function startSimulation(req: Request, res: Response): Promise<void
     // Create a new session in MongoDB
     const session = new Session({
       roomId,
-      patientProfile: 'PENDING',
+      tenantProfile: 'PENDING',
       status: 'active' as const,
       startTime: new Date(),
       messageCount: 0,

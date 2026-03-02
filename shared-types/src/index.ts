@@ -1,41 +1,57 @@
-export * from './lib/shared-types.js';
+// ─────────────────────────────────────────────
+//  RHA Simulation — Shared TypeScript Interfaces
+//  Long Term Care Facility context
+//  caregiver = care staff, tenant = aging resident
+// ─────────────────────────────────────────────
 
-// ── Agent ──────────────────────────────────────
-export type IAgentRole = 'clinician' | 'patient';
-
-// ── Room ───────────────────────────────────────
+export type IAgentRole = 'caregiver' | 'tenant';
 export type IRoomStatus = 'active' | 'idle' | 'stopped';
 
 export interface IRoom {
-  roomId: string;       // e.g. "room1"
-  name: string;         // e.g. "Provo Peak"
+  roomId: string;
+  name: string;
   status: IRoomStatus;
   activeSessionId?: string;
   messageCount?: number;
   lastSpeaker?: IAgentRole;
   lastMessageAt?: Date;
+  caregiverId: string;
+  tenantName: string;
 }
 
-// Room name mapping — single source of truth
+
 export const ROOM_NAMES: Record<string, string> = {
-  room1: 'Osama',
-  room2: 'John',
+  room1: 'Osama Room',
 };
 
-export const ALL_ROOMS = Object.keys(ROOM_NAMES); // ['room1'...'room6']
+// 3 caregivers, each assigned 2 rooms
+export const CAREGIVER_ASSIGNMENTS: Record<string, string> = {
+  room1: 'caregiver1',
+};
 
-// ── Session ────────────────────────────────────
+export const CAREGIVER_NAMES: Record<string, string> = {
+  caregiver1: 'Sarah Mitchell',
+};
+
+// Aging tenants — one per room (from Sharique's character list)
+export const TENANT_NAMES: Record<string, string> = {
+  room1: 'Michael Thompson',
+};
+
+export const ALL_ROOMS = Object.keys(ROOM_NAMES);
+
 export interface ISession {
   _id?: string;
   roomId: string;
   startTime: Date;
   endTime?: Date;
   status: 'active' | 'stopped';
-  patientProfile: string;   // symptom description used this session
+  tenantProfile: string;
+  caregiverName: string;
+  tenantName: string;
   messageCount: number;
 }
 
-// ── Message ────────────────────────────────────
 export interface IMessage {
   _id?: string;
   sessionId: string;
@@ -45,14 +61,11 @@ export interface IMessage {
   timestamp: Date;
 }
 
-// ── Socket Events ──────────────────────────────
-// Emitted from server → client via Socket.io
 export interface ISocketNewMessage {
   roomId: string;
   sessionId: string;
   role: IAgentRole;
   text: string;
-  audio?: string;       // base64 mp3 from OpenAI TTS
   timestamp: Date;
 }
 
@@ -62,13 +75,8 @@ export interface ISocketRoomUpdate {
   messageCount: number;
 }
 
-// ── API Response Shapes ────────────────────────
 export interface IApiResponse<T> {
   success: boolean;
   data?: T;
   error?: string;
-}
-
-export interface IStatusResponse {
-  rooms: IRoom[];
 }

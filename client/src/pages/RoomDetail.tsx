@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSocket } from '../hooks/useSocket';
 import { useRoomStatus } from '../hooks/useRoomStatus';
-import { ROOM_NAMES } from '@org/shared-types';
+import { ROOM_NAMES } from '../../../shared-types/src/index';
 
 export default function RoomDetail() {
   const { id: roomId = 'room1' } = useParams<{ id: string }>();
@@ -103,14 +103,6 @@ export default function RoomDetail() {
         </div>
       </div>
 
-      {/* Patient profile banner */}
-      {isActive && room?.activeSessionId && (
-        <div className="mb-3 px-4 py-2 rounded border border-amber/20 bg-amber/5 text-[11px] text-amber tracking-wide flex items-center gap-2">
-          <span className="text-amber/60">🧑 PATIENT PROFILE</span>
-          <span>Randomly selected for this session — symptoms randomized per run</span>
-        </div>
-      )}
-
       {/* Chat log */}
       <div className="flex-1 overflow-y-auto rounded-lg border border-border bg-surface p-4 flex flex-col gap-3">
         {messages.length === 0 ? (
@@ -132,14 +124,14 @@ export default function RoomDetail() {
             <div key={i} className="animate-fadein flex gap-3">
               {/* Role indicator */}
               <div className={`flex-shrink-0 w-16 pt-0.5 text-[9px] font-600 uppercase tracking-widest ${
-                m.role === 'clinician' ? 'text-cyan' : 'text-green'
+                m.role === 'caregiver' ? 'text-cyan' : 'text-green'
               }`}>
-                {m.role === 'clinician' ? '👨‍⚕️ DR.' : '🧑 PT.'}
+                {m.role === 'caregiver' ? 'CG.' : 'RES.'}
               </div>
 
               {/* Bubble */}
               <div className={`flex-1 rounded-lg px-3 py-2 border ${
-                m.role === 'clinician'
+                m.role === 'caregiver'
                   ? 'border-cyan/15 bg-cyan/5'
                   : 'border-green/15 bg-green/5'
               }`}>
@@ -158,11 +150,11 @@ export default function RoomDetail() {
       <div className="flex items-center gap-6 mt-3 text-[9px] text-muted tracking-widest">
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-sm bg-cyan/30 border border-cyan/40" />
-          CLINICIAN
+          CAREGIVER
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-sm bg-green/30 border border-green/40" />
-          PATIENT
+          RESIDENT
         </span>
         <span className="ml-auto">
           AUDIO VIA BROWSER WEB SPEECH API · RECORDED BY SONA
