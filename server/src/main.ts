@@ -1,8 +1,9 @@
 import 'dotenv/config';
+import cors from 'cors';
+import path from 'path';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import cors from 'cors';
 import { connectDB } from './db/connection.js';
 import simulationRoutes from './routes/simulation.js';
 import transcriptRoutes from './routes/transcripts.js';
@@ -35,8 +36,17 @@ async function bootstrap() {
   app.use('/api/simulation', simulationRoutes);
   app.use('/api/transcripts', transcriptRoutes);
 
-  app.use((req, res) => {
-    res.status(404).json({ success: false, error: `Route not found: ${req.path}` });
+  // Serve React client static files
+  const clientDistPath = path.join(__dirname, '../../client/dist');
+  app.use(express.static(clientDistPath));
+
+  // All non-API routes return index.html (React Router support)
+  app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/socket.io')) {
+      res.sendFile(path.join(clientDistPath, 'index.html'));
+    } else {
+      res.status(404).json({ success: false, error: `Route not found: ${req.path}` });
+    }
   });
 
   // Attach Socket.io to HTTP server

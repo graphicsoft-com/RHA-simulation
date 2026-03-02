@@ -1,5 +1,10 @@
 {
   "name": "@org/client",
   "version": "0.0.1",
-  "private": true
+  "private": true,
+  "scripts": {
+    "build": "vite build",
+    "start": "vite",
+    "preview": "vite preview"
+  }
 }
