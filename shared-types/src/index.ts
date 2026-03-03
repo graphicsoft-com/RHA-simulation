@@ -21,12 +21,12 @@ export interface IRoom {
 
 
 export const ROOM_NAMES: Record<string, string> = {
-  room1: 'Osama Room',
-  room2: 'Eleanor Room',
-  room3: 'Robert Room',
-  room4: 'Dorothy Room',
-  room5: 'Harold Room',
-  room6: 'Betty Room',
+  room1: 'Oid-06',
+  room2: 'Smokey',
+  room3: 'Provo Peak',
+  room4: 'Dragon',
+  room5: 'Oid18',
+  room6: 'Oid-02',
 };
 
 // 3 caregivers, each assigned 2 rooms

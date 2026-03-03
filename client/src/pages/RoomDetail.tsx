@@ -14,7 +14,7 @@ export default function RoomDetail() {
   const room = rooms.find(r => r.roomId === roomId);
   const isActive = room?.status === 'active';
 
-  const { messages, connected } = useSocket({ roomId, audioEnabled: true });
+  const { messages, connected, locked, lockMessage } = useSocket({ roomId, audioEnabled: true });
 
   // Auto-scroll to bottom on new message
   useEffect(() => {
@@ -39,6 +39,22 @@ export default function RoomDetail() {
 
   return (
     <div className="max-w-4xl mx-auto px-6 pt-20 pb-6 h-screen flex flex-col">
+
+      {/* Room locked banner */}
+      {locked && (
+        <div className="mb-4 px-4 py-3 rounded border border-red/40 bg-red/5 flex items-center gap-3">
+          <span className="text-red text-lg">🔒</span>
+          <span className="text-red text-sm tracking-wide">
+            {lockMessage ?? 'This room is currently in use by another client.'}
+          </span>
+          <button
+            onClick={() => navigate('/')}
+            className="ml-auto text-red/60 hover:text-red text-xs tracking-widest transition-colors"
+          >
+            ← GO BACK
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">

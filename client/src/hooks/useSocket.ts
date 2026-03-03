@@ -25,6 +25,8 @@ export function useSocket({ roomId, audioEnabled = true, dashboard = false }: Us
   const socketRef = useRef<Socket | null>(null);
   const [messages, setMessages] = useState<ISocketNewMessage[]>([]);
   const [connected, setConnected] = useState(false);
+  const [locked, setLocked] = useState(false);
+  const [lockMessage, setLockMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const socket = io(SERVER_URL, {
@@ -61,6 +63,15 @@ export function useSocket({ roomId, audioEnabled = true, dashboard = false }: Us
       setConnected(false);
     });
 
+    // ── Room locked by another client ──────────
+    socket.on('room_locked', ({ message }: { roomId: string; message: string }) => {
+      console.warn(`🔒  Room locked: ${message}`);
+      setLocked(true);
+      setLockMessage(message);
+      setConnected(false);
+      socket.disconnect();
+    });
+
     // ── Incoming message ───────────────────────
     socket.on('new_message', (data: ISocketNewMessage) => {
       // Dashboard accepts all rooms; dedicated room tab filters to its own roomId
@@ -75,9 +86,19 @@ export function useSocket({ roomId, audioEnabled = true, dashboard = false }: Us
       }
     });
 
+    // ── Room locked by another client ─────────────────
+    socket.on('room_locked', ({ message }: { roomId: string; message: string }) => {
+      console.warn(`🔒  ${message}`);
+      setLocked(true);
+      setLockMessage(message);
+      setConnected(false);
+      socket.disconnect();
+    });
+
     return () => {
       tts.stop();
       socket.disconnect();
+
       setConnected(false);
     };
   }, [roomId, audioEnabled, dashboard]);
@@ -85,6 +106,8 @@ export function useSocket({ roomId, audioEnabled = true, dashboard = false }: Us
   return {
     messages,
     connected,
+    locked,
+    lockMessage,
     clearMessages: () => setMessages([]),
   };
 }

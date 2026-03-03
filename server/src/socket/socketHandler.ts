@@ -18,6 +18,13 @@ export function registerSocketHandlers(io: Server): void {
         return;
       }
 
+      // If another socket already owns this room, deny access
+      if (roomOwners[roomId] && roomOwners[roomId] !== socket.id) {
+        console.warn(`🔒  [${roomId}] Blocked — already owned by ${roomOwners[roomId]}`);
+        socket.emit('room_locked', { roomId, message: `Room ${roomId} is currently in use. Please try again later.` });
+        return;
+      }
+
       // Leave any previously joined rooms and release prior ownership
       ALL_ROOMS.forEach(id => {
         if (roomOwners[id] === socket.id) delete roomOwners[id];
