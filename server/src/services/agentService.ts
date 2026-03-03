@@ -1,8 +1,13 @@
 import OpenAI from 'openai';
 import Session from '../models/Session';
 import Message from '../models/Message';
-import { getCaregiverPrompt, getRandomTenantPrompt } from './prompts';
-import { IAgentRole } from '../../../shared-types/src/index';
+import { buildCaregiverPrompt, buildTenantPrompt, TENANT_PROFILES, TENANT_NAMES } from './prompts';
+import {
+  createConversationState,
+  updateStateAfterTurn,
+  ConversationState,
+} from './conversationState';
+import { IAgentRole, CAREGIVER_NAMES, CAREGIVER_ASSIGNMENTS } from '../../../shared-types/src/index';
 
 // ─────────────────────────────────────────────
 //  Agent Service
@@ -151,9 +156,18 @@ export async function runRoom(
 
   console.log(`\n🟢  [${roomId}] Starting simulation (session: ${sessionId})`);
 
-  const { prompt: tenantSystemPrompt, profile, caregiverName, tenantName } = getRandomTenantPrompt(roomId);
-  const caregiverSystemPrompt = getCaregiverPrompt(roomId);
-  await Session.findByIdAndUpdate(sessionId, { tenantProfile: profile, caregiverName, tenantName });
+  // Create fresh conversation state for this session
+  const state: ConversationState = createConversationState(sessionId, roomId);
+
+  // Persist tenant info to the session record
+  const tenantName    = TENANT_NAMES[roomId];
+  const caregiverName = CAREGIVER_NAMES[CAREGIVER_ASSIGNMENTS[roomId]];
+  const tenantProfile = TENANT_PROFILES[roomId];
+  await Session.findByIdAndUpdate(sessionId, {
+    tenantProfile: `${tenantName} — ${tenantProfile.slice(0, 120)}`,
+    caregiverName,
+    tenantName,
+  });
 
   const history: AgentMessage[] = [];
   activeRooms[roomId] = true;
@@ -170,18 +184,25 @@ export async function runRoom(
 
     try {
       if (turn % 2 === 0) {
+        // ── Caregiver turn — fresh dynamic prompt every turn ──────────────
         role = 'caregiver';
-        text = await getAgentResponse(caregiverSystemPrompt, history);
+        const prompt = buildCaregiverPrompt(roomId, state);
+        text = await getAgentResponse(prompt, history);
         history.push({ role: 'assistant', content: text });
       } else {
+        // ── Tenant turn — fresh dynamic prompt every turn ─────────────────
         role = 'tenant';
-        text = await getAgentResponse(tenantSystemPrompt, flipHistory(history));
+        const prompt = buildTenantPrompt(roomId, state);
+        text = await getAgentResponse(prompt, flipHistory(history));
         history.push({ role: 'user', content: text });
       }
     } catch (err) {
       console.error(`❌  [${roomId}] Turn ${turn} failed:`, err);
       continue;
     }
+
+    // Update conversation state AFTER generating the response
+    updateStateAfterTurn(state, role as 'caregiver' | 'tenant', text);
 
     const timestamp = new Date();
 
