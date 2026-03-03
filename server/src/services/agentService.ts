@@ -208,20 +208,6 @@ export function stopRoom(roomId: string): void {
   if (activeRooms[roomId]) {
     activeRooms[roomId] = false;
     console.log(`🛑  [${roomId}] Stop signal sent`);
-
-    // Cancel the pending TTS timeout so it never fires after stop
-    if (ttsAckTimeouts[roomId]) {
-      clearTimeout(ttsAckTimeouts[roomId]!);
-      ttsAckTimeouts[roomId] = null;
-    }
-
-    // Immediately unblock waitForTTSAck so the loop reads activeRooms = false
-    // and exits cleanly without an extra "ack timeout — advancing anyway" log
-    const resolve = ttsAckResolvers[roomId];
-    if (resolve) {
-      ttsAckResolvers[roomId] = null;
-      resolve();
-    }
   } else {
     console.log(`⚠️   [${roomId}] Was not running`);
   }
