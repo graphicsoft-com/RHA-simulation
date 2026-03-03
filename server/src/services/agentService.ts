@@ -24,16 +24,19 @@ const ttsAckResolvers: Record<string, (() => void) | null> = {};
 
 const ttsAckTimeouts: Record<string, ReturnType<typeof setTimeout> | null> = {};
 
-// Fallback timeout — if client never acks (tab closed, error),
-// unblock after this many ms so the server doesn't hang forever
-const TTS_ACK_TIMEOUT_MS = 30_000;
+// Fallback timeout — bumped to 60s to handle longer TTS responses
+const TTS_ACK_TIMEOUT_MS = 60_000;
 
 // Short natural pause AFTER ack before generating next turn (ms)
 // Simulates the human "thinking" gap between turns
 const POST_ACK_PAUSE_MS = 800;
 
-// How many turns per session (30 turns ≈ 15 exchanges ≈ ~10 min of conversation)
-const TURNS_PER_SESSION = 30;
+// How many turns per session (1200 turns ≈ 600 exchanges ≈ ~10 hours of conversation)
+const TURNS_PER_SESSION = 1200;
+
+// Keep only the last N messages in context to avoid hitting token limits
+// 20 messages ≈ 10 exchanges ≈ enough context without blowing up
+const MAX_HISTORY_LENGTH = 20;
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -87,11 +90,14 @@ async function getAgentResponse(
   history: AgentMessage[],
   retries = 3
 ): Promise<string> {
+  // Trim to last MAX_HISTORY_LENGTH messages to avoid token limit errors on long sessions
+  const trimmedHistory = history.slice(-MAX_HISTORY_LENGTH);
+
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const response = await openai.chat.completions.create({
         model: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct-Turbo',
-        messages: [{ role: 'system', content: systemPrompt }, ...history],
+        messages: [{ role: 'system', content: systemPrompt }, ...trimmedHistory],
         max_tokens: 150,
         temperature: 0.8,
       });
