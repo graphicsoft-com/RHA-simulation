@@ -4,6 +4,7 @@ import path from 'path';
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import { promises as dns } from 'dns';
 import { connectDB } from './db/connection.js';
 import simulationRoutes from './routes/simulation.js';
 import transcriptRoutes from './routes/transcripts.js';
@@ -15,9 +16,23 @@ import {
 
 const PORT = process.env['PORT'] || 3000;
 
+// Warm up DNS so the first API call doesn't hit a cold resolver
+async function warmupDNS(hostname: string): Promise<void> {
+  try {
+    await dns.lookup(hostname);
+    console.log(`✅  DNS warmup OK — resolved ${hostname}`);
+  } catch (err: any) {
+    // Non-fatal: retry logic in agentService will handle it
+    console.warn(`⚠️  DNS warmup failed for ${hostname}: ${err?.code ?? err?.message}`);
+  }
+}
+
 async function bootstrap() {
 
   await connectDB();
+
+  // Warm up DNS for DeepInfra before any room can start
+  await warmupDNS('api.deepinfra.com');
 
   const app = express();
 

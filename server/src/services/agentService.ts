@@ -97,14 +97,23 @@ async function getAgentResponse(
       });
       return response.choices[0]?.message?.content?.trim() ?? '[no response]';
     } catch (err: any) {
+      // OpenAI SDK wraps fetch errors two levels deep:
+      //   APIConnectionError → TypeError: fetch failed → Error: getaddrinfo EAI_AGAIN
+      const rootCause = err?.cause?.cause ?? err?.cause ?? err;
       const isConnectionError =
-        err?.code === 'EAI_AGAIN' ||
-        err?.cause?.code === 'EAI_AGAIN' ||
-        err?.message?.includes('Connection error');
+        rootCause?.code === 'EAI_AGAIN' ||
+        rootCause?.code === 'ENOTFOUND' ||
+        rootCause?.code === 'ECONNREFUSED' ||
+        rootCause?.code === 'ECONNRESET' ||
+        err?.message?.includes('Connection error') ||
+        err?.constructor?.name === 'APIConnectionError';
 
       if (isConnectionError && attempt < retries) {
         const waitMs = attempt * 2000; // 2s, 4s, 6s
-        console.warn(`⚠️  [DNS error] Retrying in ${waitMs / 1000}s (attempt ${attempt}/${retries})`);
+        console.warn(
+          `⚠️  [DNS error] Retrying in ${waitMs / 1000}s ` +
+          `(attempt ${attempt}/${retries}) — root cause: ${rootCause?.code ?? err?.message}`
+        );
         await new Promise((r) => setTimeout(r, waitMs));
         continue;
       }
