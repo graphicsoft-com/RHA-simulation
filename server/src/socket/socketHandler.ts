@@ -1,6 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { ALL_ROOMS } from '../../../shared-types/src/index.js';
 import { acknowledgeTTS } from '../services/agentService';
+import { pendingMessages } from '../controllers/simulationController';
 
 // Tracks the authoritative TTS-owning socket per room.
 // Only a dedicated room tab (join_room) can own a room.
@@ -29,6 +30,13 @@ export function registerSocketHandlers(io: Server): void {
       console.log(`Socket ${socket.id} joined ${roomId} (owner)`);
 
       socket.emit('joined_room', { roomId });
+
+      // Flush any messages that fired before this client joined
+      if (pendingMessages[roomId]?.length) {
+        console.log(`📦  [${roomId}] Flushing ${pendingMessages[roomId].length} buffered message(s) to new owner`);
+        pendingMessages[roomId].forEach(p => socket.emit('new_message', p));
+        pendingMessages[roomId] = [];
+      }
     });
 
     // Dashboard joins all rooms for message broadcast only — NOT a TTS owner

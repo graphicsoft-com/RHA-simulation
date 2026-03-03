@@ -15,6 +15,9 @@ import { ALL_ROOMS, ROOM_NAMES } from '../../../shared-types/src/index.js';
 
 let io: Server;
 
+// Buffer for messages emitted before any client has joined the room
+export const pendingMessages: Record<string, any[]> = {};
+
 // Called once from main.ts after Socket.io is created
 export function initIO(socketIO: Server): void {
   io = socketIO;
@@ -58,7 +61,23 @@ export async function startSimulation(req: Request, res: Response): Promise<void
     // Kick off the agent loop — non-blocking (no await)
     // The loop runs in the background and emits via Socket.io
     runRoom(roomId, sessionId, (payload) => {
-      io.to(roomId).emit('new_message', payload);
+      const socketRoom = io.sockets.adapter.rooms.get(roomId);
+      const hasClients = socketRoom && socketRoom.size > 0;
+
+      if (hasClients) {
+        // Flush any buffered messages first, then send the current one
+        if (pendingMessages[roomId]?.length) {
+          console.log(`📦  [${roomId}] Flushing ${pendingMessages[roomId].length} buffered message(s) to room`);
+          pendingMessages[roomId].forEach(p => io.to(roomId).emit('new_message', p));
+          pendingMessages[roomId] = [];
+        }
+        io.to(roomId).emit('new_message', payload);
+      } else {
+        // No client in room yet — buffer until someone joins
+        if (!pendingMessages[roomId]) pendingMessages[roomId] = [];
+        pendingMessages[roomId].push(payload);
+        console.log(`📦  [${roomId}] Buffered message (no clients yet) — ${payload.role} turn`);
+      }
 
       // Also emit a room status update so the dashboard stays in sync
       io.emit('room_update', {
