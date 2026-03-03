@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { speak, stopSpeaking, initTTS } from '../services/ttsService';
+import { getRoomTTS, initTTS } from '../services/ttsService';
 import type { ISocketNewMessage } from '@org/shared-types';
 
 const SERVER_URL = import.meta.env.VITE_API_URL || '';
@@ -35,10 +35,14 @@ export function useSocket({ roomId, audioEnabled = true, dashboard = false }: Us
 
     socketRef.current = socket;
 
-    // Give ttsService the socket reference so it can emit 'tts_done'
-    // after each utterance ends — this is what syncs server to browser TTS
+    // Get or create a TTS instance scoped to THIS room
+    // Dashboard instances are flagged so they never emit tts_done
+    const tts = getRoomTTS(roomId);
     if (!dashboard && audioEnabled) {
-      initTTS(socket, roomId);
+      tts.init(socket, roomId, false);
+      initTTS(socket, roomId, false);
+    } else {
+      tts.init(socket, roomId, true); // dashboard — no tts_done emission
     }
 
     // ── Connection events ──────────────────────
@@ -59,20 +63,20 @@ export function useSocket({ roomId, audioEnabled = true, dashboard = false }: Us
 
     // ── Incoming message ───────────────────────
     socket.on('new_message', (data: ISocketNewMessage) => {
-      // In dashboard mode accept all rooms; otherwise filter by roomId
+      // Dashboard accepts all rooms; dedicated room tab filters to its own roomId
       if (!dashboard && data.roomId !== roomId) return;
 
       // Keep last 50 messages
       setMessages((prev) => [...prev.slice(-49), data]);
 
-      // 🔊 Speak via Web Speech API
-      if (audioEnabled) {
-        speak(data.text, data.role);
+      // 🔊 Only speak on a dedicated room tab — never on the dashboard
+      if (audioEnabled && !dashboard && data.roomId === roomId) {
+        tts.speak(data.text, data.role);
       }
     });
 
     return () => {
-      stopSpeaking();
+      tts.stop();
       socket.disconnect();
       setConnected(false);
     };

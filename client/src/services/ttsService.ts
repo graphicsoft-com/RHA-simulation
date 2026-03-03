@@ -1,37 +1,20 @@
 // ─────────────────────────────────────────────
 //  TTS Service — Browser Web Speech API
-//  Speaks text aloud then emits 'tts_done'
-//  back to server so next turn is unlocked
+//  Per-room instances to avoid cross-room bleed
 // ─────────────────────────────────────────────
 
 import type { Socket } from 'socket.io-client';
 import type { IAgentRole } from '@org/shared-types';
 
-// Socket reference — injected once from useSocket hook
-let _socket: Socket | null = null;
-let _currentRoomId: string = '';
-
-export function initTTS(socket: Socket, roomId: string): void {
-  _socket = socket;
-  _currentRoomId = roomId;
-}
-
-// ── Voice Selection ────────────────────────────────────────────────────────
-// Browsers load voices asynchronously — we wait for them to be ready
+// ── Voice helpers ──────────────────────────────────────────────────────────
 
 function getVoices(): Promise<SpeechSynthesisVoice[]> {
   return new Promise((resolve) => {
     const voices = window.speechSynthesis.getVoices();
-    if (voices.length > 0) {
-      resolve(voices);
-      return;
-    }
-    // Voices not loaded yet — wait for the event
+    if (voices.length > 0) { resolve(voices); return; }
     window.speechSynthesis.addEventListener(
       'voiceschanged',
-      () => {
-        resolve(window.speechSynthesis.getVoices());
-      },
+      () => resolve(window.speechSynthesis.getVoices()),
       { once: true }
     );
   });
@@ -40,20 +23,20 @@ function getVoices(): Promise<SpeechSynthesisVoice[]> {
 async function selectVoice(role: IAgentRole): Promise<SpeechSynthesisVoice | null> {
   const voices = await getVoices();
 
-  if (role === 'clinician') {
+  if (role === 'caregiver') {
     return (
-      voices.find((v) => v.name.includes('David')) || // Windows
-      voices.find((v) => v.name.includes('Alex')) || // macOS
-      voices.find((v) => v.name.includes('Daniel')) || // macOS UK
+      voices.find((v) => v.name.includes('David')) ||
+      voices.find((v) => v.name.includes('Alex')) ||
+      voices.find((v) => v.name.includes('Daniel')) ||
       voices.find((v) => v.name.toLowerCase().includes('male')) ||
       voices.find((v) => v.lang === 'en-US') ||
       voices[0]
     ) ?? null;
   } else {
     return (
-      voices.find((v) => v.name.includes('Samantha')) || // macOS
-      voices.find((v) => v.name.includes('Zira')) || // Windows
-      voices.find((v) => v.name.includes('Karen')) || // macOS AU
+      voices.find((v) => v.name.includes('Samantha')) ||
+      voices.find((v) => v.name.includes('Zira')) ||
+      voices.find((v) => v.name.includes('Karen')) ||
       voices.find((v) => v.name.toLowerCase().includes('female')) ||
       voices.find((v) => v.lang === 'en-GB') ||
       voices[1] ||
@@ -62,52 +45,113 @@ async function selectVoice(role: IAgentRole): Promise<SpeechSynthesisVoice | nul
   }
 }
 
-// ── Core speak — returns promise that resolves AFTER speech ends ───────────
+// ── Per-room TTS instance ──────────────────────────────────────────────────
 
-export async function speak(text: string, role: IAgentRole): Promise<void> {
-  return new Promise(async (resolve) => {
-    // Cancel anything currently speaking
-    window.speechSynthesis.cancel();
+export class RoomTTS {
+  private _socket: Socket | null = null;
+  private _roomId: string = '';
+  private _isDashboard: boolean = false;
+  private _currentUtterance: SpeechSynthesisUtterance | null = null;
+  private _isSpeaking: boolean = false;
 
-    const utterance = new SpeechSynthesisUtterance(text);
-    const voice = await selectVoice(role);
-    if (voice) utterance.voice = voice;
+  init(socket: Socket, roomId: string, isDashboard = false): void {
+    this._socket = socket;
+    this._roomId = roomId;
+    this._isDashboard = isDashboard;
+  }
 
-    if (role === 'clinician') {
-      utterance.rate  = 0.92;
-      utterance.pitch = 0.9;
-    } else {
-      utterance.rate  = 1.05;
-      utterance.pitch = 1.15;
+  async speak(text: string, role: IAgentRole): Promise<void> {
+    // Server gates turns via tts_done so this should never fire,
+    // but guard anyway to prevent double-queuing in the same tab
+    if (this._isSpeaking) {
+      console.warn(`[TTS] Already speaking in ${this._roomId} — skipping`);
+      return;
     }
 
-    utterance.lang   = 'en-US';
-    utterance.volume = 1.0;
+    return new Promise(async (resolve) => {
+      this._isSpeaking = true;
 
-    utterance.onend = () => {
-      // ✅ Speech finished — tell server it can send the next turn
-      if (_socket && _currentRoomId) {
-        _socket.emit('tts_done', _currentRoomId);
-        console.log(`🔔  tts_done emitted for ${_currentRoomId}`);
+      const utterance = new SpeechSynthesisUtterance(text);
+      this._currentUtterance = utterance;
+
+      const voice = await selectVoice(role);
+      if (voice) utterance.voice = voice;
+
+      if (role === 'caregiver') {
+        utterance.rate  = 0.92;
+        utterance.pitch = 0.9;
+      } else {
+        utterance.rate  = 1.05;
+        utterance.pitch = 1.15;
       }
-      resolve();
-    };
 
-    utterance.onerror = (e) => {
-      console.warn(`TTS error (${role}):`, e.error);
-      // Still emit tts_done so server doesn't hang
-      if (_socket && _currentRoomId) {
-        _socket.emit('tts_done', _currentRoomId);
-      }
-      resolve();
-    };
+      utterance.lang   = 'en-US';
+      utterance.volume = 1.0;
 
-    window.speechSynthesis.speak(utterance);
-  });
+      utterance.onend = () => {
+        this._isSpeaking = false;
+        // Only the dedicated room tab acks — dashboard must never emit tts_done
+        if (this._socket && this._roomId && !this._isDashboard) {
+          this._socket.emit('tts_done', this._roomId);
+          console.log(`🔔  tts_done emitted for ${this._roomId}`);
+        }
+        this._currentUtterance = null;
+        resolve();
+      };
+
+      utterance.onerror = (e) => {
+        this._isSpeaking = false;
+        console.warn(`TTS error (${role}):`, e.error);
+        if (this._socket && this._roomId && !this._isDashboard) {
+          this._socket.emit('tts_done', this._roomId);
+        }
+        this._currentUtterance = null;
+        resolve();
+      };
+
+      // ✅ Just speak — do NOT call cancel() first.
+      // cancel() is global to the browser process and would kill other tabs' audio.
+      window.speechSynthesis.speak(utterance);
+    });
+  }
+
+  stop(): void {
+    this._isSpeaking = false;
+    if (this._currentUtterance) {
+      this._currentUtterance.onend = null;
+      this._currentUtterance.onerror = null;
+      this._currentUtterance = null;
+    }
+    // Do NOT call window.speechSynthesis.cancel() — it kills every tab's audio
+  }
+}
+
+// ── Per-room instance registry ─────────────────────────────────────────────
+
+const _instances: Record<string, RoomTTS> = {};
+
+export function getRoomTTS(roomId: string): RoomTTS {
+  if (!_instances[roomId]) {
+    _instances[roomId] = new RoomTTS();
+  }
+  return _instances[roomId];
+}
+
+// ── Legacy shim — keeps existing callers working ───────────────────────────
+
+export function initTTS(socket: Socket, roomId: string, isDashboard = false): void {
+  getRoomTTS(roomId).init(socket, roomId, isDashboard);
+}
+
+export async function speak(text: string, role: IAgentRole, roomId: string): Promise<void> {
+  return getRoomTTS(roomId).speak(text, role);
 }
 
 export function stopSpeaking(): void {
-  window.speechSynthesis.cancel();
+  // Intentionally NOT calling window.speechSynthesis.cancel().
+  // That API is global to the browser process — calling it from one tab
+  // cancels audio that may be playing in every other tab on the same machine.
+  // Each RoomTTS instance manages its own utterance lifecycle via stop().
 }
 
 export function isTTSSupported(): boolean {

@@ -84,15 +84,35 @@ function waitForTTSAck(roomId: string): Promise<void> {
 
 async function getAgentResponse(
   systemPrompt: string,
-  history: AgentMessage[]
+  history: AgentMessage[],
+  retries = 3
 ): Promise<string> {
-  const response = await openai.chat.completions.create({
-    model: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct-Turbo',
-    messages: [{ role: 'system', content: systemPrompt }, ...history],
-    max_tokens: 150,
-    temperature: 0.8,
-  });
-  return response.choices[0]?.message?.content?.trim() ?? '[no response]';
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const response = await openai.chat.completions.create({
+        model: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct-Turbo',
+        messages: [{ role: 'system', content: systemPrompt }, ...history],
+        max_tokens: 150,
+        temperature: 0.8,
+      });
+      return response.choices[0]?.message?.content?.trim() ?? '[no response]';
+    } catch (err: any) {
+      const isConnectionError =
+        err?.code === 'EAI_AGAIN' ||
+        err?.cause?.code === 'EAI_AGAIN' ||
+        err?.message?.includes('Connection error');
+
+      if (isConnectionError && attempt < retries) {
+        const waitMs = attempt * 2000; // 2s, 4s, 6s
+        console.warn(`⚠️  [DNS error] Retrying in ${waitMs / 1000}s (attempt ${attempt}/${retries})`);
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+
+      throw err; // give up after all retries
+    }
+  }
+  throw new Error('Max retries reached');
 }
 
 function flipHistory(history: AgentMessage[]): AgentMessage[] {
