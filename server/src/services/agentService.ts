@@ -1,13 +1,13 @@
 import OpenAI from 'openai';
 import Session from '../models/Session';
 import Message from '../models/Message';
-import { buildCaregiverPrompt, buildTenantPrompt, TENANT_PROFILES, TENANT_NAMES } from './prompts';
+import { buildCaregiverPrompt, buildTenantPrompt, TENANT_PROFILES } from './prompts';
 import {
   createConversationState,
   updateStateAfterTurn,
   ConversationState,
 } from './conversationState';
-import { IAgentRole, CAREGIVER_NAMES, CAREGIVER_ASSIGNMENTS } from '../../../shared-types/src/index';
+import { IAgentRole, CAREGIVER_NAMES, CAREGIVER_ASSIGNMENTS, TENANT_NAMES } from '../../../shared-types/src/index';
 
 // ─────────────────────────────────────────────
 //  Agent Service
