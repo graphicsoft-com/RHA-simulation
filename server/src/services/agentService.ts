@@ -30,7 +30,7 @@ const ttsAckResolvers: Record<string, (() => void) | null> = {};
 const ttsAckTimeouts: Record<string, ReturnType<typeof setTimeout> | null> = {};
 
 // Fallback timeout — bumped to 60s to handle longer TTS responses
-const TTS_ACK_TIMEOUT_MS = 60_000;
+const TTS_ACK_TIMEOUT_MS = 30_000;
 
 // Short natural pause AFTER ack before generating next turn (ms)
 // Simulates the human "thinking" gap between turns
