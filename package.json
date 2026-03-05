@@ -37,6 +37,7 @@
     "eslint-plugin-react-hooks": "5.0.0",
     "jiti": "2.4.2",
     "jsdom": "~22.1.0",
+    "mongodb-memory-server": "^11.0.1",
     "nx": "22.5.2",
     "postcss": "8.4.38",
     "prettier": "~3.6.2",

@@ -95,14 +95,24 @@ async function getAgentResponse(
   systemPrompt: string,
   history: AgentMessage[]
 ): Promise<string> {
-  const response = await openai.chat.completions.create({
-    model: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct-Turbo', // fast + high quality on DeepInfra
-    messages: [{ role: 'system', content: systemPrompt }, ...history],
-    max_tokens: 150,       // keeps responses short — 2-3 sentences
-    temperature: 0.8,      // slight creativity so it doesn't sound repetitive
-  });
+  console.log(`  📤 Calling LLM with ${history.length} history messages...`);
+  
+  try {
+    const response = await openai.chat.completions.create({
+      model: 'meta-llama/Llama-4-Maverick-17B-128E-Instruct-Turbo', // fast + high quality on DeepInfra
+      messages: [{ role: 'system', content: systemPrompt }, ...history],
+      max_tokens: 150,       // keeps responses short — 2-3 sentences
+      temperature: 0.8,      // slight creativity so it doesn't sound repetitive
+    });
 
-  return response.choices[0]?.message?.content?.trim() ?? '[no response]';
+    const result = response.choices[0]?.message?.content?.trim() ?? '[no response]';
+    console.log(`  ✅ LLM returned: "${result.substring(0, 70)}..."`);
+    return result;
+  } catch (err) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error(`  ❌ LLM API ERROR: ${errorMsg}`);
+    throw err;
+  }
 }
 
 // The patient agent sees the conversation history from ITS perspective
@@ -151,7 +161,9 @@ export async function runRoom(
       if (turn % 2 === 0) {
         // ── Clinician's turn ─────────────────────────
         role = 'clinician';
+        console.log(`[${roomId}] Turn ${turn + 1}: Generating clinician response...`);
         text = await getAgentResponse(CLINICIAN_SYSTEM_PROMPT, history);
+        console.log(`[${roomId}] Turn ${turn + 1}: Clinician generated "${text.substring(0, 60)}..."`);
 
         // Add to history as assistant (clinician IS the assistant in this thread)
         history.push({ role: 'assistant', content: text });
@@ -159,16 +171,20 @@ export async function runRoom(
       } else {
         // ── Patient's turn ───────────────────────────
         role = 'patient';
-
+        console.log(`[${roomId}] Turn ${turn + 1}: Generating patient response... (history length: ${history.length})`);
+        
         // Patient sees a flipped view of history so IT is the assistant
-        text = await getAgentResponse(patientSystemPrompt, flipHistory(history));
+        const patientHistory = flipHistory(history);
+        console.log(`[${roomId}] Turn ${turn + 1}: Patient history length: ${patientHistory.length}`);
+        text = await getAgentResponse(patientSystemPrompt, patientHistory);
+        console.log(`[${roomId}] Turn ${turn + 1}: Patient generated "${text.substring(0, 60)}..."`);
 
         // Add patient response to history as user (from clinician's POV)
         history.push({ role: 'user', content: text });
       }
 
     } catch (err) {
-      console.error(`❌  [${roomId}] Turn ${turn} failed:`, err);
+      console.error(`❌  [${roomId}] Turn ${turn + 1} FAILED:`, err instanceof Error ? err.message : err);
       continue;
     }
 

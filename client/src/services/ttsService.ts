@@ -84,23 +84,52 @@ export async function speak(text: string, role: IAgentRole): Promise<void> {
     utterance.lang   = 'en-US';
     utterance.volume = 1.0;
 
-    utterance.onend = () => {
-      // ✅ Speech finished — tell server it can send the next turn
-      if (_socket && _currentRoomId) {
-        _socket.emit('tts_done', _currentRoomId);
-        console.log(`🔔  tts_done emitted for ${_currentRoomId}`);
+    // Track if we already emitted tts_done to avoid duplicate emissions
+    let ackEmitted = false;
+    let fallbackTimerId: ReturnType<typeof setTimeout> | null = null;
+
+    function emitAck() {
+      if (ackEmitted) return;
+      ackEmitted = true;
+      // Clear fallback timeout if it exists
+      if (fallbackTimerId) {
+        clearTimeout(fallbackTimerId);
+        fallbackTimerId = null;
       }
+      if (_socket && _currentRoomId) {
+        console.log(`📡  Emitting tts_done for ${_currentRoomId}`);
+        _socket.emit('tts_done', _currentRoomId);
+      } else {
+        console.warn(`⚠️   Cannot emit tts_done: socket=${!!_socket}, roomId=${_currentRoomId}`);
+      }
+    }
+
+    utterance.onstart = () => {
+      console.log(`🎙️  Started speaking (${role}): "${text.substring(0, 60)}..."`);
+    };
+
+    utterance.onend = () => {
+      console.log(`✅  Speech ended naturally for ${role}`);
+      emitAck();
       resolve();
     };
 
     utterance.onerror = (e) => {
-      console.warn(`TTS error (${role}):`, e.error);
-      // Still emit tts_done so server doesn't hang
-      if (_socket && _currentRoomId) {
-        _socket.emit('tts_done', _currentRoomId);
-      }
+      console.warn(`❌ TTS error (${role}):`, e.error);
+      emitAck();
       resolve();
     };
+
+    // Fallback timeout: estimate how long speech should take
+    // Add safety margin to avoid cutting off mid-speech
+    const estimatedMs = Math.max(500, (text.length / 140) * 1000 * 1.2);
+    fallbackTimerId = setTimeout(() => {
+      if (!ackEmitted) {
+        console.warn(`⏱️  TTS fallback timeout after ${estimatedMs}ms (onend not fired)`);
+        emitAck();
+        resolve();
+      }
+    }, estimatedMs + 2000); // +2s extra buffer
 
     window.speechSynthesis.speak(utterance);
   });

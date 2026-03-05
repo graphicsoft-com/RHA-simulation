@@ -1,14 +1,13 @@
 import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 
-
-const MONGO_URI = process.env.MONGO_URI || '';
-
-if (!MONGO_URI) {
-  throw new Error('MONGO_URI is not defined in your .env file');
-}
+// We prefer a real MongoDB URI, but a memory server will be used if
+// connection fails (useful when Docker isn't available on dev machine).
+let MONGO_URI = process.env.MONGO_URI || '';
 
 // Track connection state so we don't reconnect on every call
 let isConnected = false;
+let memoryServer: MongoMemoryServer | null = null;
 
 export async function connectDB(): Promise<void> {
   if (isConnected) {
@@ -16,17 +15,15 @@ export async function connectDB(): Promise<void> {
     return;
   }
 
-  try {
-    await mongoose.connect(MONGO_URI, {
+  async function connect(uri: string) {
+    await mongoose.connect(uri, {
       // healthy connection over long runs
       serverSelectionTimeoutMS: 5000,   // fail fast if Atlas unreachable
       socketTimeoutMS: 45000,
     });
-
     isConnected = true;
     console.log('MongoDB connected:', mongoose.connection.host);
 
-    // Log disconnection events so we know when Atlas drops
     mongoose.connection.on('disconnected', () => {
       console.warn('MongoDB disconnected');
       isConnected = false;
@@ -36,10 +33,22 @@ export async function connectDB(): Promise<void> {
       console.log('🔄  MongoDB reconnected');
       isConnected = true;
     });
+  }
 
-  } catch (error) {
-    console.error('MongoDB connection failed:', error);
-    process.exit(1);
+  try {
+    if (!MONGO_URI) {
+      throw new Error('no MONGO_URI');
+    }
+    await connect(MONGO_URI);
+  } catch (err) {
+    console.warn('Failed to connect to MongoDB at', MONGO_URI, '-', err.message || err);
+    console.warn('Falling back to in-memory MongoDB instance');
+
+    if (!memoryServer) {
+      memoryServer = await MongoMemoryServer.create();
+    }
+    MONGO_URI = memoryServer.getUri();
+    await connect(MONGO_URI);
   }
 }
 
